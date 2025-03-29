@@ -28,18 +28,25 @@ def main():
     )
 
     for message in consumer:
-        event = message.value.decode('utf-8')
-        values = event.split(',')
-        if 'recommendation request' in values[2]:
-            # TODO: Increment the request count metric for the appropriate HTTP status code.
-            # Hint: Extract the status code from the message and use it as a label for the metric.
-            print(values) # - You can print values and see how to get the status
-            # status = Eg. 200,400 etc
-            # REQUEST_COUNT.?(status).inc()
+        try:
+            event = message.value.decode('utf-8')
+            values = event.split(',')
+            if len(values) < 3:
+                print(f"Not valid message: {event}")
+                continue
 
-            # Updating request latency histogram
-            time_taken = float(values[-1].strip().split(" ")[0])
-            REQUEST_LATENCY.observe(time_taken / 1000)
+            if 'recommendation request' in values[2]:
+                # Increment the request count metric for the appropiate HTTP status code.
+                status = values[3].strip() if len(values) > 3 else 'unknown'
+                REQUEST_COUNT.labels(http_status=status).inc()
+
+                # Updating request latency histogram
+                time_taken = float(values[-1].strip().split(" ")[0]) if len(values) > 4 else 0
+                REQUEST_LATENCY.observe(time_taken / 1000)
+
+                print(f"Processing: {values}")
+        except Exception as e:
+            print(f"Error procesando el mensaje: {e}")
 
 if __name__ == "__main__":
     main()
